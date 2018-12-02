@@ -1,33 +1,40 @@
 package com.example.parsedomfromurl.service;
 
-import org.apache.log4j.Logger;
+import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.net.URI;
-import java.util.concurrent.atomic.AtomicReference;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.util.stream.Collectors;
 
 @Component
+@Slf4j
 public class ParseUrlService {
-    private final static Logger logger = Logger.getLogger(ParseUrlService.class);
 
-    public String parseUrl(String inUrl) {
+    /**
+     * This method get all advertisements href of page
+     * @param inUrl
+     * @return string(all url of advertisements)
+     */
+    public final String parseUrl(final String inUrl) throws IOException {
         try {
-            Document doc = Jsoup.connect(inUrl).get();
-            String host = URI.create(inUrl).getHost();
-            Elements links = doc.select("a[href]");
-            AtomicReference<StringBuilder> result = new AtomicReference<>(new StringBuilder("Рекламные ссылки: \n"));
-            links.stream()
+            final Document doc = Jsoup.connect(inUrl).get();
+            final String host = URI.create(inUrl).getHost();
+            final Elements links = doc.select("a[href]");
+            return "Рекламные ссылки: \n    " + links.stream()
                     .map(link -> link.attr("href"))
-                    .filter(hrefUrl -> hrefUrl.contains("http"))
-                    .filter(hrefUrl -> !host.equals(URI.create(hrefUrl).getHost()))
-                    .forEach(hrefUrl -> result.get().append("    ").append(hrefUrl).append("\n"));
-            return result.toString();
-        } catch (Exception e) {
-            logger.error("Error during parsing url", e);
-            return "Exception";
+                    .parallel()
+                    .filter(hrefUrl -> hrefUrl.contains("http") && !host.equals(URI.create(hrefUrl).getHost()))
+                    .collect(Collectors.joining("\n    "));
+        } catch (final IOException e) {
+            log.error("Error during parsing url", e);
+            throw new IOException(e);
         }
     }
 }
